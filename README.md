@@ -1,5 +1,8 @@
 # PDF Explain — Browser Extension
 
+<img width="1887" height="1075" alt="image" src="https://github.com/user-attachments/assets/67bc603c-61c2-4c81-ae2e-4a08e5c84f94" />
+
+
 A fallback PDF viewer that rewrites complex pages into clearer content in real-time.
 
 ## Architecture
