@@ -158,10 +158,17 @@ body {
   cursor: pointer;
   text-transform: uppercase;
   transition: background var(--transition-fast);
+  white-space: nowrap;
 }
 
 #explainer-toggle:hover {
   background: var(--button-hover);
+}
+
+/* Injected into toolbar: use toolbar's positioning, remove fixed styles */
+#explainer-toggle.injected-in-toolbar {
+  position: static;
+  margin-left: var(--spacing-sm);
 }
 
 /* — Content Area */
@@ -210,6 +217,106 @@ body {
 
 .state-error p {
   margin-bottom: var(--spacing-sm);
+}
+
+/* — Stream Progress Indicator (Phase 3) */
+.stream-progress {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stream-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* — Button Loading State */
+#explainer-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#explainer-toggle .stream-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  margin-right: 4px;
+}
+
+/* — Floating Button Fallback (Phase 2) */
+#explainer-toggle:not(.injected-in-toolbar) {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 999998;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+#explainer-toggle:not(.injected-in-toolbar):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* — Viewer-specific overrides (Phase 3) */
+
+/* Chrome native PDF viewer */
+embed[type="application/pdf"] ~ #explainer-toggle.injected-in-toolbar,
+object[type="application/pdf"] ~ #explainer-toggle.injected-in-toolbar {
+  position: static;
+  margin-left: var(--spacing-sm);
+}
+
+/* Firefox PDF.js */
+body[data-firefox] #pdf-explain-overlay,
+[data-useragent*="Firefox"] #pdf-explain-overlay {
+  /* Firefox-specific adjustments if needed */
+}
+
+/* Edge PDF viewer */
+.chrome-pdf-toolbar ~ #explainer-toggle.injected-in-toolbar {
+  position: static;
+  margin-left: var(--spacing-sm);
+}
+
+/* PDF.js standalone viewer */
+#pdf-viewer ~ #explainer-toggle.injected-in-toolbar,
+.pdfViewer ~ #explainer-toggle.injected-in-toolbar {
+  position: static;
+  margin-left: var(--spacing-sm);
+}
+
+/* Small screens: ensure button is accessible */
+@media (max-width: 768px) {
+  #explainer-toggle:not(.injected-in-toolbar) {
+    bottom: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  #pdf-explain-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  #pdf-explain-controls {
+    justify-content: space-between;
+  }
 }
 
 /* — Hide PDF canvas when explainer overlay is active */
