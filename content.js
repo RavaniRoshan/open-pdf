@@ -137,6 +137,11 @@ const cleanupHandlers = new Set();
 // Phase 2: Viewer detection
 let detectedViewer = null;
 
+// Initialize PDF.js worker path (set once at load time)
+if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+}
+
 // === Init ===
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
@@ -751,17 +756,13 @@ async function* streamRewrite(text, level, signal) {
 }
 
 // === Helpers ===
+// PDF.js is pre-loaded via manifest; just ensure worker is configured
 async function loadPDFJS() {
   if (!window.pdfjsLib) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('lib/pdf.js');
-      script.onload = resolve;
-      script.onerror = (e) => reject(new Error('Failed to load PDF.js library'));
-      document.head.appendChild(script);
-    });
+    throw new Error('PDF.js library not loaded');
   }
-  if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+  // Worker path already set at top-level, but ensure it's correct
+  if (window.pdfjsLib.GlobalWorkerOptions) {
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
   }
 }

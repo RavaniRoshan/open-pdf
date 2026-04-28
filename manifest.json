@@ -5,10 +5,16 @@
   "description": "A fallback PDF viewer that rewrites complex pages into clearer content",
   "permissions": [],
   "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/pdf.worker.min.js"],
+      "matches": ["*://*/*.pdf*"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["*://*/*.pdf*"],
-      "js": ["content.js"],
+      "js": ["lib/pdf.js", "content.js"],
       "css": ["styles/main.css"],
       "run_at": "document_idle"
     }
