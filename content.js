@@ -184,7 +184,7 @@ async function loadPDFJS() {
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('lib/pdf.js');
       script.onload = resolve;
-      script.onerror = reject;
+      script.onerror = (e) => reject(new Error('Failed to load PDF.js library'));
       document.head.appendChild(script);
     });
   }
@@ -264,9 +264,9 @@ function waitForPDFJS(timeout = 5000) {
   });
 }
 
-// Try strategies in order: existing viewer → fetch+arrayBuffer → embed → blob
+// Try strategies in order: existing viewer → fetch+arrayBuffer → embed → blob → DOM fallback
 async function tryExtractText() {
-  // 1) Hook existing viewer (works for PDF.js viewers)
+  // 1) Hook existing viewer (PDF.js viewer instance)
   const viewer = getPdfViewerInstance();
   if (viewer && (viewer.pdfDocument || viewer.pages)) {
     const page = await findCurrentPage(viewer);
@@ -274,6 +274,75 @@ async function tryExtractText() {
       const tc = await page.getTextContent();
       return tc.items.map(i => i.str).join(' ');
     }
+  }
+
+  // 2) Fetch PDF and feed as ArrayBuffer
+  try {
+    const resp = await fetch(window.location.href, { credentials: 'include' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await doc.getPage(getCurrentPageNum());
+    const tc = await page.getTextContent();
+    return tc.items.map(i => i.str).join(' ');
+  } catch (e) {
+    console.warn('[PDF Explain] Strategy 2 (fetch+arrayBuffer) failed:', e);
+  }
+
+  // 3) Embedded <embed> fallback
+  const embed = document.querySelector('embed[type="application/pdf"]');
+  if (embed && embed.src) {
+    try {
+      const resp = await fetch(embed.src, { credentials: 'include' });
+      if (resp.ok) {
+        const buf = await resp.arrayBuffer();
+        const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+        const page = await doc.getPage(getCurrentPageNum());
+        const tc = await page.getTextContent();
+        return tc.items.map(i => i.str).join(' ');
+      }
+    } catch (e) {
+      console.warn('[PDF Explain] Strategy 3 (embed) failed:', e);
+    }
+  }
+
+  // 4) Blob fallback
+  try {
+    const blob = await fetch(window.location.href).then(r => r.blob());
+    const blobUrl = URL.createObjectURL(blob);
+    const doc = await window.pdfjsLib.getDocument(blobUrl).promise;
+    const page = await doc.getPage(getCurrentPageNum());
+    const tc = await page.getTextContent();
+    return tc.items.map(i => i.str).join(' ');
+  } catch (e) {
+    console.warn('[PDF Explain] Strategy 4 (blob) failed:', e);
+  }
+
+  // 5) DOM fallback — extract visible text from page (Chrome native viewer)
+  const domText = extractTextFromDOM();
+  if (domText) return domText;
+
+  throw new Error('Text extraction failed; try a different PDF or viewer.');
+}
+
+// Fallback: grab visible text from document body, excluding extension UI
+function extractTextFromDOM() {
+  // Clone body to avoid mutating live DOM
+  const clone = document.body.cloneNode(true);
+  // Remove extension elements
+  const extensionEls = clone.querySelectorAll('#explainer-toggle, #pdf-explain-overlay, .pdf-explain');
+  extensionEls.forEach(el => el.remove());
+  // Also try to remove common UI elements (toolbar, etc.)
+  const uiSelectors = ['#toolbar', '.toolbar', '.viewerToolbar', '.pdf-toolbar', '[role="toolbar"]', '#header', '#footer'];
+  uiSelectors.forEach(sel => {
+    const els = clone.querySelectorAll(sel);
+    els.forEach(el => el.remove());
+  });
+  // Get innerText (rendered text, respects line breaks)
+  const text = clone.innerText || clone.textContent || '';
+  // Collapse whitespace, limit length
+  return text.replace(/\s+/g, ' ').trim().substring(0, 10000);
+}
   }
 
   // 2) Fetch PDF and feed as ArrayBuffer (works cross-origin if server sends CORS headers)
