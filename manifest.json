@@ -4,9 +4,7 @@
   "version": "1.0.0",
   "description": "A fallback PDF viewer that rewrites complex pages into clearer content",
   "permissions": [],
-  "host_permissions": [
-    "https://api.groq.com/*"
-  ],
+  "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["*://*/*.pdf*"],

@@ -169,7 +169,8 @@ async function runExplainer() {
   } catch (err) {
     if (err.name === 'AbortError') return;
     console.error('[PDF Explain] pipeline error:', err);
-    showErrorWithRetry(`Error: ${err.message}`);
+    const errorMsg = (err && typeof err === 'object' && err.message) ? err.message : String(err);
+    showErrorWithRetry(`Error: ${errorMsg}`);
   } finally {
     if (abortController === myController) abortController = null;
     rewriteInProgress = false;
@@ -178,22 +179,19 @@ async function runExplainer() {
 
 // === Helpers ===
 async function loadPDFJS() {
-  if (window.pdfjsLib) return;
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('lib/pdf.js');
-    script.onload = () => {
-      try {
-        // Set worker src for PDF.js (MV3 extension-safe)
-        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
-        }
-        resolve();
-      } catch (e) { reject(e); }
-    };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('lib/pdf.js');
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  // Always set workerSrc (overwrite if page already loaded PDF.js)
+  if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+  }
 }
 
 function showErrorWithRetry(message) {
