@@ -1,7 +1,3 @@
 name = "pdf-proxy"
 main = "src/index.js"
 compatibility_date = "2026-04-01"
-
-# No static assets — pure JavaScript worker
-# This tells Wrangler not to look for a public/ directory
-assets = false
