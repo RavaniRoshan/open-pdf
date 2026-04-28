@@ -8,7 +8,7 @@
   "web_accessible_resources": [
     {
       "resources": ["lib/pdf.worker.min.js"],
-      "matches": ["*://*/*.pdf*"]
+      "matches": ["*://*/*"]
     }
   ],
   "content_scripts": [
