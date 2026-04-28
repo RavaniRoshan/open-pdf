@@ -354,8 +354,7 @@ async function findCurrentPage(viewer) {
 // ==========================================
 //  LLM Proxy via Cloudflare Worker (Slice 3–4)
 // ==========================================
-// TODO: Replace with your deployed worker URL before publishing
-const PROXY_ENDPOINT = 'https://pdf-proxy.YOUR-ACCOUNT.workers.dev';
+const PROXY_ENDPOINT = 'https://open-pdf.shivamkumar10958.workers.dev';
 
 async function* streamRewrite(text, level, signal) {
   const response = await fetch(PROXY_ENDPOINT, {
