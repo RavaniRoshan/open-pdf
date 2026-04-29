@@ -42,6 +42,17 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.url && tab.url.toLowerCase().endsWith('.pdf')) {
+    const readerUrl = chrome.runtime.getURL('templates/reader.html') + '?file=' + encodeURIComponent(tab.url);
+    chrome.tabs.create({ url: readerUrl });
+  } else {
+    // If not a PDF, maybe show a message or just open the reader without a file
+    const readerUrl = chrome.runtime.getURL('templates/reader.html');
+    chrome.tabs.create({ url: readerUrl });
+  }
+});
+
 // Also handle direct messages (one-time) for non-streaming operations
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'pdf-explain-check-rate-limit') {
@@ -74,7 +85,7 @@ function handlePortMessage(portId, port, msg) {
 }
 
 async function handleStreamExtract(portId, port, msg) {
-  const { text, level, requestId } = msg;
+  const { text, level, requestId, pageNumber } = msg;
   const tabId = port.sender?.tab?.id;
 
   // Check rate limit before starting
@@ -124,7 +135,7 @@ async function handleStreamExtract(portId, port, msg) {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, level }),
+        body: JSON.stringify({ text, level, pageNumber }),
         signal,
       });
 

@@ -7,16 +7,15 @@
   "host_permissions": ["<all_urls>"],
   "web_accessible_resources": [
     {
-      "resources": ["lib/pdf.worker.min.js"],
+      "resources": [
+        "lib/pdf.worker.min.js",
+        "templates/reader.html",
+        "templates/reader.js",
+        "styles/main.css",
+        "lib/pdf.js",
+        "lib/marked.min.js"
+      ],
       "matches": ["*://*/*"]
-    }
-  ],
-  "content_scripts": [
-    {
-      "matches": ["*://*/*.pdf*"],
-      "js": ["lib/pdf.js", "content.js"],
-      "css": ["styles/main.css"],
-      "run_at": "document_idle"
     }
   ],
   "background": {

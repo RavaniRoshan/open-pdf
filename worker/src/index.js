@@ -56,7 +56,7 @@ export default {
       return new Response('Invalid JSON', { status: 400 });
     }
 
-    const { text, level } = body;
+    const { text, level, pageNumber } = body;
     if (!text || typeof text !== 'string') {
       return new Response('Missing "text" field', { status: 400 });
     }
@@ -64,7 +64,7 @@ export default {
     const effectiveLevel = validLevels.includes(level) ? level : 'normal';
 
     // === Build prompt ===
-    const prompt = buildPrompt(text, effectiveLevel);
+    const prompt = buildPrompt(text, effectiveLevel, pageNumber);
 
     // === Forward to Groq (server-side, key never exposed) ===
     let groqResponse;
@@ -156,40 +156,47 @@ function checkRateLimit(ip) {
 }
 
 // === Prompts ===
-function buildPrompt(text, level) {
+function buildPrompt(text, level, pageNumber) {
+  const pageContext = pageNumber ? `\nNote: This is text extracted specifically from Page ${pageNumber} of the document.` : '';
+
+  const commonConstraints = `
+- If you encounter fragmented data arrays, raw numbers, or broken formulas, DO NOT attempt to rewrite or interpret them. Preserve them exactly as extracted or explicitly state [Unreadable Formula/Table].
+- Keep all numeric and author-date citations (e.g. [1], (Smith et al., 2019)) exactly where they appear in the original text.
+- Preserve technical meaning and key details.
+- Do not summarize the document as a whole. Focus strictly on explaining the text provided from this specific page.
+- Do not add commentary or opinion.`;
+
   const t = {
-    simple: `Rewrite the content to improve clarity for a beginner.
+    simple: `Rewrite the content to improve clarity for a beginner.${pageContext}
 
 Constraints:
-- Use simple, everyday language
-- Avoid jargon and technical terms
-- Explain any necessary concepts intuitively
-- Keep sentences short and direct
-- Preserve all key information and meaning
+${commonConstraints}
+- Use simple, everyday language and avoid jargon.
+- Explain any necessary concepts intuitively.
+- Keep sentences short and direct.
 
 Content:
 {text}`,
 
-    normal: `Rewrite the content to improve clarity while staying faithful to the original.
+    normal: `Rewrite the content to improve clarity while staying faithful to the original.${pageContext}
 
 Constraints:
-- Preserve meaning and key details
-- Improve sentence structure and flow
-- Remove unnecessary complexity
-- Use clear, standard language
-- Do not add commentary or opinion
+${commonConstraints}
+- Improve sentence structure and flow.
+- Remove unnecessary complexity.
+- Use clear, standard language.
 
 Content:
 {text}`,
 
-    technical: `Rewrite the content with precision and structure for a technical audience.
+    technical: `Rewrite the content with precision and structure for a technical audience.${pageContext}
 
 Constraints:
-- Use precise terminology
-- Maintain logical structure
-- Include relevant details and specifics
-- Be concise but complete
-- Preserve technical accuracy
+${commonConstraints}
+- Use precise terminology.
+- Maintain logical structure.
+- Include relevant details and specifics.
+- Be concise but complete.
 
 Content:
 {text}`
