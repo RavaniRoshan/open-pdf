@@ -1,0 +1,28 @@
+{
+  "name": "open-pdf",
+  "version": "1.0.0",
+  "description": "<h1 align=\"center\">PDF Explain</h1>",
+  "main": "background.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RavaniRoshan/open-pdf.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RavaniRoshan/open-pdf/issues"
+  },
+  "homepage": "https://github.com/RavaniRoshan/open-pdf#readme",
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.83",
+    "esbuild": "^0.28.0"
+  }
+}

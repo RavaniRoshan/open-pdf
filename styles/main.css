@@ -196,10 +196,36 @@ body.open-pdf-hijacked {
   height: 20px;
 }
 
-.open-pdf-peek-toggle[aria-pressed="true"] {
+.open-pdf-peek-toggle[aria-pressed="true"],
+.open-pdf-local-toggle[aria-pressed="true"] {
   background: var(--open-pdf-soft);
   color: var(--open-pdf-orange);
   border-color: rgba(240, 75, 47, 0.2);
+}
+
+.open-pdf-local-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--open-pdf-border);
+  border-radius: var(--open-pdf-radius-md);
+  background: #ffffff;
+  color: #6b7280;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 180ms ease;
+}
+
+.open-pdf-local-toggle:hover {
+  background: #f9fafb;
+  color: var(--open-pdf-text);
+  transform: translateY(-1px);
+}
+
+.open-pdf-icon-lock {
+  width: 20px;
+  height: 20px;
 }
 
 .open-pdf-toggle {

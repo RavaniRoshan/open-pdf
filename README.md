@@ -24,6 +24,8 @@ PDFs are a graveyard of good intentions. They are a visual coordinate format, no
   - `Technical`: Clarifies and structures the text for a technical audience while preserving precision.
 - **True "Stealth" Peek Mode:** Need to see the original chart or formula? Hold `Shift` or click the Eye icon. The Explainer UI becomes 10% transparent and passes all clicks through to the native PDF embedded underneath. 
 - **Flawless Page Synchronization:** When you turn the page in Explainer Mode, the native PDF underneath automatically updates its hash to stay perfectly synced.
+- **Smart Local Caching:** Once a page is explained, it's instantly cached locally. Re-visiting pages requires zero API calls and loads instantly.
+- **Local AI Privacy Mode (Beta):** Click the Lock icon to download a highly optimized WebLLM model directly into your browser. Explanations will run 100% locally via WebGPU, providing a truly zero-cloud, privacy-first experience.
 - **Defensive Engineering:** Built-in safeguards to handle multi-column scrambling, ligature fixing, scanned document detection, and proper Markdown rendering for AI outputs.
 - **Cost-Efficient:** Extracts and processes strictly one page at a time.
 

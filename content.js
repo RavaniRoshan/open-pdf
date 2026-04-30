@@ -30,6 +30,12 @@ const icons = {
       <circle cx="12" cy="12" r="3" />
     </svg>
   `,
+  lock: `
+    <svg class="open-pdf-icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+  `,
   spinner: `
     <svg class="open-pdf-spinner" viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="9"></circle>
@@ -42,6 +48,7 @@ const state = {
   mode: 'pdf',
   level: DEFAULT_LEVEL,
   peek: false,
+  localAI: false,
   root: null,
   nativeEmbed: null,
   nativeObject: null,
@@ -224,6 +231,12 @@ function renderShell() {
             ${LEVELS.map(renderLevelButton).join('')}
           </div>
 
+          ${window.IS_ISOLATED_READER ? `
+          <button class="open-pdf-local-toggle" type="button" data-action="toggle-local" title="Use Private Local AI" aria-pressed="${state.localAI}">
+            ${icons.lock}
+          </button>
+          ` : ''}
+
           <button class="open-pdf-peek-toggle" type="button" data-action="toggle-peek" aria-pressed="${state.peek}">
             ${icons.peek}
           </button>
@@ -269,6 +282,19 @@ function togglePeek(force) {
   syncUiState();
 }
 
+function toggleLocalAI() {
+  if (!window.LocalEngine) {
+    showError("Local AI engine is not available.");
+    return;
+  }
+  state.localAI = !state.localAI;
+  syncUiState();
+  if (state.mode === 'explainer') {
+    cancelCurrentStream();
+    runExplainer();
+  }
+}
+
 function attachRootEvents() {
   if (!state.root || state.root.dataset.eventsAttached === 'true') return;
 
@@ -276,6 +302,12 @@ function attachRootEvents() {
     const peek = event.target.closest('[data-action="toggle-peek"]');
     if (peek) {
       togglePeek();
+      return;
+    }
+
+    const localToggle = event.target.closest('[data-action="toggle-local"]');
+    if (localToggle) {
+      toggleLocalAI();
       return;
     }
 
@@ -455,6 +487,11 @@ function syncUiState() {
   state.root.dataset.level = state.level;
   state.root.dataset.peek = state.peek;
 
+  const localToggle = state.root.querySelector('.open-pdf-local-toggle');
+  if (localToggle) {
+    localToggle.setAttribute('aria-pressed', String(state.localAI));
+  }
+
   const peekToggle = state.root.querySelector('.open-pdf-peek-toggle');
   if (peekToggle) {
     peekToggle.setAttribute('aria-pressed', String(state.peek));
@@ -491,6 +528,28 @@ async function retryCurrentMode() {
   }
 }
 
+async function generateCacheKey(text, level, pageNumber) {
+  const msgUint8 = new TextEncoder().encode(`${level}:${pageNumber}:${text}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `open_pdf_cache_${hashHex}`;
+}
+
+async function checkCache(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([key], (result) => {
+      resolve(result[key] || null);
+    });
+  });
+}
+
+async function saveToCache(key, explanation) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ [key]: explanation }, () => resolve());
+  });
+}
+
 async function runExplainer() {
   if (!state.originalText) {
     showStatus('Loading page text...');
@@ -507,47 +566,65 @@ async function runExplainer() {
   state.root.classList.add('is-loading-explainer');
   syncUiState();
 
-  content.innerHTML = `
-    <div class="open-pdf-skeleton">
-      <div class="open-pdf-skeleton-line" style="width: 100%"></div>
-      <div class="open-pdf-skeleton-line" style="width: 90%"></div>
-      <div class="open-pdf-skeleton-line" style="width: 95%"></div>
-      <div class="open-pdf-skeleton-line" style="width: 40%"></div>
-    </div>
-  `;
-
-  const article = document.createElement('article');
-  article.className = 'open-pdf-document open-pdf-explanation';
-  article.style.display = 'none'; // Hide until first chunk
-
-  const paragraph = document.createElement('p');
-  paragraph.className = 'open-pdf-stream-line';
-
-  const highlight = document.createElement('span');
-  highlight.className = 'open-pdf-stream-highlight';
-
-  paragraph.appendChild(highlight);
-  article.appendChild(paragraph);
-
-  const progress = document.createElement('div');
-  progress.className = 'open-pdf-stream-status';
-  progress.innerHTML = `${icons.spinner}<span>Generating ${state.level} explanation...</span>`;
-  article.appendChild(progress);
-
-  content.appendChild(article);
-
   try {
-    const result = await streamWithBackgroundWorker(state.originalText, state.level, highlight, progress, () => {
-      // First chunk arrived callback
+    const cacheKey = await generateCacheKey(state.originalText, state.level, state.pageNumber);
+    const cachedExplanation = await checkCache(cacheKey);
+
+    if (cachedExplanation && state.streamRunId === runId) {
+      state.root.classList.remove('is-loading-explainer');
+      renderStreamedExplanation(cachedExplanation);
+      state.streaming = false;
+      syncUiState();
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="open-pdf-skeleton">
+        <div class="open-pdf-skeleton-line" style="width: 100%"></div>
+        <div class="open-pdf-skeleton-line" style="width: 90%"></div>
+        <div class="open-pdf-skeleton-line" style="width: 95%"></div>
+        <div class="open-pdf-skeleton-line" style="width: 40%"></div>
+      </div>
+    `;
+
+    const article = document.createElement('article');
+    article.className = 'open-pdf-document open-pdf-explanation';
+    article.style.display = 'none'; // Hide until first chunk
+
+    const paragraph = document.createElement('p');
+    paragraph.className = 'open-pdf-stream-line';
+
+    const highlight = document.createElement('span');
+    highlight.className = 'open-pdf-stream-highlight';
+
+    paragraph.appendChild(highlight);
+    article.appendChild(paragraph);
+
+    const progress = document.createElement('div');
+    progress.className = 'open-pdf-stream-status';
+    progress.innerHTML = `${icons.spinner}<span>Generating ${state.level} explanation...</span>`;
+    article.appendChild(progress);
+
+    content.appendChild(article);
+
+    let result = '';
+    const firstChunkCallback = () => {
       state.root.classList.remove('is-loading-explainer');
       const skeleton = content.querySelector('.open-pdf-skeleton');
       if (skeleton) skeleton.remove();
       article.style.display = 'block';
-    }, state.pageNumber);
-    
+    };
+
+    if (state.localAI && window.LocalEngine) {
+      result = await streamWithLocalEngine(state.originalText, state.level, highlight, progress, firstChunkCallback, state.pageNumber);
+    } else {
+      result = await streamWithBackgroundWorker(state.originalText, state.level, highlight, progress, firstChunkCallback, state.pageNumber);
+    }
+
     if (state.mode === 'explainer' && state.streamRunId === runId) {
       state.root.classList.remove('is-loading-explainer');
       renderStreamedExplanation(result);
+      await saveToCache(cacheKey, result);
     }
   } catch (err) {
     if (isAbortError(err)) return;
@@ -701,6 +778,47 @@ function streamWithBackgroundWorker(text, level, targetSpan, progressEl, onFirst
       requestId,
     });
   });
+}
+
+async function streamWithLocalEngine(text, level, targetSpan, progressEl, onFirstChunk, pageNumber) {
+  if (!window.LocalEngine) throw new Error("LocalEngine not bundled.");
+  
+  const pageContext = pageNumber ? `\nNote: This is text extracted specifically from Page ${pageNumber} of the document.` : '';
+  const systemPrompt = `Rewrite the content to improve clarity while staying faithful to the original.${pageContext}
+Constraints:
+- If you encounter fragmented data arrays, raw numbers, or broken formulas, DO NOT attempt to rewrite or interpret them. Preserve them exactly as extracted or explicitly state [Unreadable Formula/Table].
+- Keep all numeric and author-date citations (e.g. [1], (Smith et al., 2019)) exactly where they appear in the original text.
+- Preserve technical meaning and key details.
+- Do not summarize the document as a whole. Focus strictly on explaining the text provided from this specific page.
+- Do not add commentary or opinion.`;
+
+  await window.LocalEngine.init((progress) => {
+    if (progressEl) {
+      progressEl.innerHTML = `${icons.spinner}<span>Downloading Local AI... ${Math.round(progress.progress * 100)}%</span>`;
+    }
+  });
+
+  const controller = new AbortController();
+  state.streamAbortController = controller;
+  
+  let buffer = '';
+  let firstChunkReported = false;
+  const startedAt = Date.now();
+  
+  for await (const chunk of window.LocalEngine.stream(systemPrompt, text)) {
+    if (controller.signal.aborted) throw new DOMException('Stream aborted', 'AbortError');
+    buffer += chunk;
+    if (!firstChunkReported && buffer.length > 0) {
+      firstChunkReported = true;
+      if (onFirstChunk) onFirstChunk();
+    }
+    targetSpan.textContent = buffer;
+    updateStreamProgress(progressEl, buffer.length, startedAt, 'Local AI Generating...');
+  }
+  
+  progressEl?.remove();
+  state.streamAbortController = null;
+  return buffer;
 }
 
 function cancelCurrentStream() {
