@@ -7,7 +7,7 @@
  * - render extracted page text or streamed explanation inside the custom UI
  */
 
-const LEVELS = ['simple', 'normal', 'technical'];
+const LEVELS = ['normal', 'simple', 'technical'];
 const DEFAULT_LEVEL = 'normal';
 const STREAM_FLUSH_MS = 80;
 
@@ -233,11 +233,6 @@ function renderShell() {
             ${icons.external}
           </button>
           `}
-
-          <button class="open-pdf-toggle" type="button" data-action="toggle-explainer" aria-pressed="${state.mode === 'explainer'}">
-            ${icons.sparkle}
-            <span>${state.mode === 'explainer' ? 'Explainer ON' : 'Explainer OFF'}</span>
-          </button>
         </nav>
       </header>
 
@@ -278,12 +273,6 @@ function attachRootEvents() {
   if (!state.root || state.root.dataset.eventsAttached === 'true') return;
 
   state.root.addEventListener('click', (event) => {
-    const toggle = event.target.closest('[data-action="toggle-explainer"]');
-    if (toggle) {
-      toggleExplainer();
-      return;
-    }
-
     const peek = event.target.closest('[data-action="toggle-peek"]');
     if (peek) {
       togglePeek();
@@ -433,41 +422,30 @@ function applyScrollPercentage(percentage) {
   });
 }
 
-async function toggleExplainer() {
-  const scrollPct = getScrollPercentage();
-
-  if (state.mode === 'explainer') {
-    cancelCurrentStream();
-    state.mode = 'pdf';
-    syncUiState();
-    renderOriginalTextParagraphs(state.originalText);
-    applyScrollPercentage(scrollPct);
-    return;
-  }
-
-  state.mode = 'explainer';
-  syncUiState();
-
-  if (!state.originalText && !state.loadingOriginal) {
-    await loadOriginalText();
-    applyScrollPercentage(scrollPct);
-    return;
-  }
-
-  await runExplainer();
-  applyScrollPercentage(scrollPct);
-}
-
 async function setLevel(nextLevel) {
   if (!LEVELS.includes(nextLevel) || nextLevel === state.level) return;
 
+  const scrollPct = getScrollPercentage();
   state.level = nextLevel;
-  syncUiState();
 
-  if (state.mode !== 'explainer') return;
+  if (nextLevel === 'normal') {
+    state.mode = 'pdf';
+    cancelCurrentStream();
+    syncUiState();
+    renderOriginalTextParagraphs(state.originalText);
+  } else {
+    state.mode = 'explainer';
+    syncUiState();
 
-  cancelCurrentStream();
-  await runExplainer();
+    if (!state.originalText && !state.loadingOriginal) {
+      await loadOriginalText();
+    } else {
+      cancelCurrentStream();
+      await runExplainer();
+    }
+  }
+
+  applyScrollPercentage(scrollPct);
 }
 
 function syncUiState() {
@@ -476,15 +454,6 @@ function syncUiState() {
   state.root.dataset.mode = state.mode;
   state.root.dataset.level = state.level;
   state.root.dataset.peek = state.peek;
-
-  const toggle = state.root.querySelector('.open-pdf-toggle');
-  if (toggle) {
-    toggle.setAttribute('aria-pressed', String(state.mode === 'explainer'));
-    toggle.innerHTML = `
-      ${icons.sparkle}
-      <span>${state.mode === 'explainer' ? 'Explainer ON' : 'Explainer OFF'}</span>
-    `;
-  }
 
   const peekToggle = state.root.querySelector('.open-pdf-peek-toggle');
   if (peekToggle) {
