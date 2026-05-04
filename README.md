@@ -1,4 +1,4 @@
-<h1 align="center">PDF Explain</h1>
+<h1 align="center">OPEN_PDX</h1>
 
 <p align="center">
   <strong>A resilient, intelligent PDF viewer that rewrites complex documents for absolute clarity.</strong>
